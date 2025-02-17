@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 # Set script to exit on error
 set -e
