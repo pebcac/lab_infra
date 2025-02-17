@@ -1,4 +1,4 @@
-# validate.yml
+---
 name: Validate Documentation
 
 on:

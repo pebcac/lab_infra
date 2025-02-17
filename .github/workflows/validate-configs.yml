@@ -1,4 +1,4 @@
-# validate-configs.yml
+---
 name: Validate Configurations
 
 on:
