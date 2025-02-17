@@ -24,6 +24,7 @@ jobs:
         run: |
           # Create minimal init file to load org-mode
           echo "(require 'org)" > init.el
+          echo "(require 'org-lint)" >> init.el
           emacs --batch --no-init-file --load init.el --eval '(org-lint-file "README.org")'
 
   validate-documentation:
