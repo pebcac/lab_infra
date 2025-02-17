@@ -1,0 +1,133 @@
+name: Validate Configurations
+
+on:
+  push:
+    paths:
+      - '**/*.conf'
+      - '**/*.zone'
+      - '**/*.db'
+  pull_request:
+    paths:
+      - '**/*.conf'
+      - '**/*.zone'
+      - '**/*.db'
+
+jobs:
+  validate-dns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install BIND tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bind9utils bind9
+
+      - name: Validate named.conf
+        run: |
+          named-checkconf dns/config/named.conf
+
+      - name: Validate zone files
+        run: |
+          named-checkzone lab.com dns/config/db.lab.com
+          named-checkzone 10.168.192.in-addr.arpa dns/config/db.10.168.192
+
+      - name: Check for required DNS records
+        run: |
+          for domain in partner engg clust kvm cicd; do
+            if ! grep -q "api.$domain" dns/config/db.lab.com; then
+              echo "Missing api.$domain record"
+              exit 1
+            fi
+            if ! grep -q "*.apps.$domain" dns/config/db.lab.com; then
+              echo "Missing *.apps.$domain record"
+              exit 1
+            fi
+          done
+
+  validate-dhcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install ISC DHCP server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y isc-dhcp-server
+
+      - name: Validate dhcpd.conf
+        run: |
+          dhcpd -t -cf dhcp/config/dhcpd.conf
+
+      - name: Check for required DHCP configuration
+        run: |
+          for subnet in "192.168.10"; do
+            if ! grep -q "subnet $subnet.0 netmask" dhcp/config/dhcpd.conf; then
+              echo "Missing subnet configuration for $subnet"
+              exit 1
+            fi
+          done
+
+  validate-file-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check required files exist
+        run: |
+          required_files=(
+            "dns/config/named.conf"
+            "dns/config/db.lab.com"
+            "dns/config/db.10.168.192"
+            "dhcp/config/dhcpd.conf"
+            "dns/src/Dockerfile"
+            "dhcp/src/Dockerfile"
+            "deploy.sh"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required file: $file"
+              exit 1
+            fi
+          done
+
+      - name: Check directory structure
+        run: |
+          required_dirs=(
+            "dns/config"
+            "dns/data"
+            "dns/src"
+            "dhcp/config"
+            "dhcp/data"
+            "dhcp/src"
+            "nfs/config"
+            "nfs/data"
+          )
+
+          for dir in "${required_dirs[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "Missing required directory: $dir"
+              exit 1
+            fi
+          done
+
+  validate-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check syntax of configuration files
+        run: |
+          # Check for common syntax errors in zone files
+          for file in dns/config/*.zone dns/config/db.*; do
+            if [ -f "$file" ]; then
+              if grep -q '[^[:space:]]$' "$file"; then
+                echo "Warning: $file contains lines ending without whitespace"
+              fi
+              if ! grep -q "IN.*SOA" "$file"; then
+                echo "Error: $file missing SOA record"
+                exit 1
+              fi
+            fi
+          done
