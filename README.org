@@ -1,4 +1,6 @@
 #+TITLE: Lab Infrastructure Deployment
+
+[[https://github.com/pebcac/lab_infra/actions/workflows/validate-configs.yml/badge.svg]]
 #+AUTHOR: Preston Davis
 #+DATE: 2024-02-17
 #+OPTIONS: num:nil
