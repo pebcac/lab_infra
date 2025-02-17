@@ -1,0 +1,30 @@
+$TTL    604800
+@       IN      SOA     infra.lab.com. root.lab.com. (
+                     2024021701         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+
+@       IN      NS      infra.lab.com.
+@       IN      A       192.168.10.2
+
+; Infrastructure
+2       IN      PTR     infra.lab.com.
+
+; Partner hosts
+10      IN      PTR     idclab695.partner.lab.com.
+
+; Engineering hosts
+104     IN      PTR     idclab479.engg.lab.com.
+
+; Cluster hosts
+165     IN      PTR     idclab647.clust.lab.com.
+166     IN      PTR     idclab648.clust.lab.com.
+
+; KVM hosts
+177     IN      PTR     idclab649.kvm.lab.com.
+178     IN      PTR     idclab484.kvm.lab.com.
+
+; CICD hosts
+198     IN      PTR     idclab650.cicd.lab.com.
