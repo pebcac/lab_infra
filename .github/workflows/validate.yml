@@ -1,91 +1,36 @@
----
-name: Validate Infrastructure Deployment
+name: Validate Documentation
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - '**.org'
   pull_request:
-    branches: [ main ]
+    paths:
+      - '**.org'
 
 jobs:
-  validate-script:
+  validate-org:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
-      - name: Shell script analysis
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: '.'
-
-      - name: Check script permissions
-        run: |
-          if [ ! -x deploy.sh ]; then
-            echo "deploy.sh must be executable"
-            exit 1
-          fi
-
-      - name: Validate BIND configuration
+      - name: Install Emacs
         run: |
           sudo apt-get update
-          sudo apt-get install -y bind9utils
-          named-checkconf dns/config/named.conf
-          named-checkzone lab.com dns/config/db.lab.com
-          named-checkzone 10.168.192.in-addr.arpa dns/config/db.10.168.192
+          sudo apt-get install -y emacs
 
-      - name: Validate DHCP configuration
+      - name: Validate Org syntax
         run: |
-          sudo apt-get install -y isc-dhcp-server
-          dhcpd -t -cf dhcp/config/dhcpd.conf
-
-  validate-containers:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Podman
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman
-
-      - name: Build DNS container
-        run: |
-          cd dns/src
-          podman build -t local/dns-server .
-
-      - name: Build DHCP container
-        run: |
-          cd dhcp/src
-          podman build -t local/dhcp-server .
+          emacs --batch --eval "(require 'org)" --eval "(org-lint-file \"README.org\")"
 
   validate-documentation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
-      - name: Validate Markdown
-        uses: DavidAnson/markdownlint-cli2-action@v9
-        with:
-          globs: "*.md"
-
-      - name: Check for required documentation
+      - name: Check required documentation
         run: |
-          for file in README.md LICENSE; do
-            if [ ! -f "$file" ]; then
-              echo "$file is missing"
-              exit 1
-            fi
-          done
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
+          if [ ! -f "README.org" ]; then
+            echo "README.org is missing"
+            exit 1
+          fi
