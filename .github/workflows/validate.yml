@@ -10,22 +10,25 @@ on:
       - '**.org'
 
 jobs:
-  validate-org:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Emacs
+      - uses: actions/checkout@v2
+      - name: Set up Emacs
         run: |
           sudo apt-get update
-          sudo apt-get install -y emacs-nox
-
-      - name: Validate Org syntax
+          sudo apt-get install -y emacs
+      - name: Create minimal init file to load org-mode
         run: |
-          # Create minimal init file to load org-mode
-          echo "(require 'org)" > init.el
+          echo "(require 'package)" > init.el
+          echo "(package-initialize)" >> init.el
+          echo "(unless (package-installed-p 'org)" >> init.el
+          echo "  (package-refresh-contents)" >> init.el
+          echo "  (package-install 'org))" >> init.el
+          echo "(require 'org)" >> init.el
           echo "(require 'org-lint)" >> init.el
-          emacs --batch --no-init-file --load init.el --eval '(org-lint-file "README.org")'
+      - name: Lint README.org
+        run: emacs --batch --no-init-file --load init.el --eval '(org-lint-file "README.org")'
 
   validate-documentation:
     runs-on: ubuntu-latest
