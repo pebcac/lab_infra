@@ -530,20 +530,45 @@ sudo firewall-cmd --permanent --add-service=mountd
 sudo firewall-cmd --reload
 echo "✓ Firewall rules configured"
 
-# Generate systemd service files
+# Generate systemd service files using Quadlets
 echo "Setting up systemd services..."
-mkdir -p ~/.config/systemd/user/
-podman generate systemd --name dns-server --files --new
-podman generate systemd --name dhcp-server --files --new
-mv container-dns-server.service ~/.config/systemd/user/
-mv container-dhcp-server.service ~/.config/systemd/user/
-echo "✓ Systemd services created"
+mkdir -p ~/.config/containers/systemd/
 
-# Enable and start services
+# Create DNS Quadlet
+cat > ~/.config/containers/systemd/dns-server.container << 'EOF'
+[Container]
+Image=localhost/local/dns-server:latest
+Network=host
+Volume=${HOME}/lab-infra/dns/config:/etc/bind
+Volume=${HOME}/lab-infra/dns/data:/var/lib/bind
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Create DHCP Quadlet
+cat > ~/.config/containers/systemd/dhcp-server.container << 'EOF'
+[Container]
+Image=localhost/local/dhcp-server:latest
+Network=host
+AddCapability=NET_ADMIN
+Volume=${HOME}/lab-infra/dhcp/config:/etc/dhcp
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Reload and start services
 systemctl --user daemon-reload
 systemctl --user enable container-dns-server container-dhcp-server
 systemctl --user start container-dns-server container-dhcp-server
-echo "✓ Services enabled and started"
+echo "✓ Systemd services created and started"
 
 echo ""
 echo "=== Deployment Complete ==="
