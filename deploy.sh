@@ -39,23 +39,25 @@ cleanup_existing() {
     echo "Checking for existing files and directories..."
 
     # Clean existing configuration files
-    rm -f ~/lab-infra/dns/config/named.conf
-    rm -f ~/lab-infra/dns/config/db.lab.com
-    rm -f ~/lab-infra/dns/config/db.10.168.192
-    rm -f ~/lab-infra/dhcp/config/dhcpd.conf
-    rm -f ~/.config/systemd/user/container-dns-server.service
-    rm -f ~/.config/systemd/user/container-dhcp-server.service
+    [[ -f ~/lab-infra/dns/config/named.conf ]] && rm -f ~/lab-infra/dns/config/named.conf
+    [[ -f ~/lab-infra/dns/config/db.lab.com ]] && rm -f ~/lab-infra/dns/config/db.lab.com
+    [[ -f ~/lab-infra/dns/config/db.10.168.192 ]] && rm -f ~/lab-infra/dns/config/db.10.168.192
+    [[ -f ~/lab-infra/dhcp/config/dhcpd.conf ]] && rm -f ~/lab-infra/dhcp/config/dhcpd.conf
+    [[ -f ~/.config/systemd/user/container-dns-server.service ]] && rm -f ~/.config/systemd/user/container-dns-server.service
+    [[ -f ~/.config/systemd/user/container-dhcp-server.service ]] && rm -f ~/.config/systemd/user/container-dhcp-server.service
 
     # Clean Dockerfiles
-    rm -f ~/lab-infra/dns/src/Dockerfile
-    rm -f ~/lab-infra/dhcp/src/Dockerfile
+    [[ -f ~/lab-infra/dns/src/Dockerfile ]] && rm -f ~/lab-infra/dns/src/Dockerfile
+    [[ -f ~/lab-infra/dhcp/src/Dockerfile ]] && rm -f ~/lab-infra/dhcp/src/Dockerfile
 
     # Clean directories but preserve the structure
-    rm -rf ~/lab-infra/dns/data/*
-    rm -rf ~/lab-infra/dhcp/data/*
-    rm -rf /var/named/data/* 2>/dev/null || true
-    rm -rf /var/named/dynamic/* 2>/dev/null || true
-    rm -rf /exports/* 2>/dev/null || true
+    # Use setopt/unsetopt to temporarily disable error on no matches
+    setopt local_options no_nomatch
+    [[ -d ~/lab-infra/dns/data ]] && rm -rf ~/lab-infra/dns/data/*
+    [[ -d ~/lab-infra/dhcp/data ]] && rm -rf ~/lab-infra/dhcp/data/*
+    sudo rm -rf /var/named/data/* 2>/dev/null || true
+    sudo rm -rf /var/named/dynamic/* 2>/dev/null || true
+    sudo rm -rf /exports/* 2>/dev/null || true
 
     echo "✓ Cleanup completed"
 }
