@@ -392,7 +392,7 @@ subnet 192.168.10.0 netmask 255.255.255.0 {
         allow members of "ocp-clust-hosts";
         range 192.168.10.160 192.168.10.175;
         option domain-name "ocp-clust.com";
-        option routers 192.168.10.161;
+        option routers 192.168.10.1;
     }
 
     # OCP KVM pool (176-190)
@@ -400,7 +400,7 @@ subnet 192.168.10.0 netmask 255.255.255.0 {
         allow members of "ocp-kvm-hosts";
         range 192.168.10.176 192.168.10.190;
         option domain-name "ocp-kvm.com";
-        option routers 192.168.10.177;
+        option routers 192.168.10.1;
     }
 
     # OCP CICD pool (191-200)
@@ -408,7 +408,7 @@ subnet 192.168.10.0 netmask 255.255.255.0 {
         allow members of "ocp-cicd-hosts";
         range 192.168.10.191 192.168.10.200;
         option domain-name "ocp-cicd.com";
-        option routers 192.168.10.192;
+        option routers 192.168.10.1;
     }
 }
 
