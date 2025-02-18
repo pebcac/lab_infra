@@ -9,10 +9,10 @@ check_prerequisites() {
     # Check if running on RHEL/CentOS/Fedora
     if command -v dnf &> /dev/null; then
         echo "Installing required packages using dnf..."
-        sudo dnf install -y bind-utils bind dhcp-server nfs-utils &> /dev/null
+        sudo dnf install -y bind-utils bind dhcp-server nfs-utils podman-systemd &> /dev/null
     elif command -v yum &> /dev/null; then
         echo "Installing required packages using yum..."
-        sudo yum install -y bind-utils bind dhcp nfs-utils &> /dev/null
+        sudo yum install -y bind-utils bind dhcp nfs-utils podman-systemd &> /dev/null
     else
         echo "❌ Unsupported package manager. Please install packages manually."
         return 1
@@ -116,8 +116,10 @@ cleanup_existing() {
     [[ -f ~/lab-infra/dns/config/db.lab.com ]] && rm -f ~/lab-infra/dns/config/db.lab.com
     [[ -f ~/lab-infra/dns/config/db.10.168.192 ]] && rm -f ~/lab-infra/dns/config/db.10.168.192
     [[ -f ~/lab-infra/dhcp/config/dhcpd.conf ]] && rm -f ~/lab-infra/dhcp/config/dhcpd.conf
-    [[ -f ~/.config/systemd/user/container-dns-server.service ]] && rm -f ~/.config/systemd/user/container-dns-server.service
-    [[ -f ~/.config/systemd/user/container-dhcp-server.service ]] && rm -f ~/.config/systemd/user/container-dhcp-server.service
+    [[ -f ~/.config/systemd/user/dns-server.service ]] && rm -f ~/.config/systemd/user/dns-server.service
+    [[ -f ~/.config/systemd/user/dhcp-server.service ]] && rm -f ~/.config/systemd/user/dhcp-server.service
+    [[ -f ~/.config/containers/systemd/dns-server.container ]] && rm -f ~/.config/containers/systemd/dns-server.container
+    [[ -f ~/.config/containers/systemd/dhcp-server.container ]] && rm -f ~/.config/containers/systemd/dhcp-server.container
 
     # Clean Dockerfiles
     [[ -f ~/lab-infra/dns/src/Dockerfile ]] && rm -f ~/lab-infra/dns/src/Dockerfile
@@ -210,7 +212,7 @@ options {
         secroots-file   "/var/lib/bind/named.secroots";
         recursing-file  "/var/lib/bind/named.recursing";
         allow-query     { any; };
-        forwarders      { 1.1.1.1; 1.0.0.1; };
+        forwarders      { a1.1.1.1; 1.0.0.1; };
         recursion yes;
         dnssec-validation no;
         managed-keys-directory "/var/lib/bind";
@@ -240,7 +242,6 @@ zone "." IN {
         file "/etc/bind/named.ca";
 };
 EOF
-
 echo "✓ Named configuration created"
 
 # Create forward zone file
@@ -536,6 +537,11 @@ mkdir -p ~/.config/containers/systemd/
 
 # Create DNS Quadlet
 cat > ~/.config/containers/systemd/dns-server.container << 'EOF'
+[Unit]
+Description=DNS Server Container
+After=network-online.target
+Wants=network-online.target
+
 [Container]
 Image=localhost/local/dns-server:latest
 Network=host
@@ -544,6 +550,7 @@ Volume=${HOME}/lab-infra/dns/data:/var/lib/bind
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target
@@ -551,6 +558,11 @@ EOF
 
 # Create DHCP Quadlet
 cat > ~/.config/containers/systemd/dhcp-server.container << 'EOF'
+[Unit]
+Description=DHCP Server Container
+After=network-online.target
+Wants=network-online.target
+
 [Container]
 Image=localhost/local/dhcp-server:latest
 Network=host
@@ -559,15 +571,19 @@ Volume=${HOME}/lab-infra/dhcp/config:/etc/dhcp
 
 [Service]
 Restart=always
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target
 EOF
 
+# Enable podman socket
+systemctl --user enable --now podman.socket
+
 # Reload and start services
 systemctl --user daemon-reload
-systemctl --user enable dns-server.service dhcp-server.service
-systemctl --user start dns-server.service dhcp-server.service
+systemctl --user enable --now ~/.config/containers/systemd/dns-server.container
+systemctl --user enable --now ~/.config/containers/systemd/dhcp-server.container
 echo "✓ Systemd services created and started"
 
 echo ""
