@@ -212,7 +212,7 @@ options {
         secroots-file   "/var/lib/bind/named.secroots";
         recursing-file  "/var/lib/bind/named.recursing";
         allow-query     { any; };
-        forwarders      { a1.1.1.1; 1.0.0.1; };
+        forwarders      { 1.1.1.1; 1.0.0.1; };
         recursion yes;
         dnssec-validation no;
         managed-keys-directory "/var/lib/bind";
