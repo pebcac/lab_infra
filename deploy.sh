@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Set script to exit on error
 set -e
@@ -46,6 +46,10 @@ cleanup_existing() {
     rm -f ~/.config/systemd/user/container-dns-server.service
     rm -f ~/.config/systemd/user/container-dhcp-server.service
 
+    # Clean Dockerfiles
+    rm -f ~/lab-infra/dns/src/Dockerfile
+    rm -f ~/lab-infra/dhcp/src/Dockerfile
+
     # Clean directories but preserve the structure
     rm -rf ~/lab-infra/dns/data/*
     rm -rf ~/lab-infra/dhcp/data/*
@@ -68,6 +72,50 @@ sudo mkdir -p /var/named/{data,dynamic}
 sudo mkdir -p /exports/{home,data,apps}
 echo "✓ Directory structure created"
 
+# Create DNS Dockerfile
+echo "Creating DNS Dockerfile..."
+cat > ~/lab-infra/dns/src/Dockerfile << 'EOF'
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    apt-get install -y bind9 bind9utils bind9-doc dnsutils curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Get root hints file
+RUN curl -o /etc/bind/named.ca https://www.internic.net/domain/named.root
+
+# Create required directories
+RUN mkdir -p /var/run/named && \
+    mkdir -p /var/cache/bind && \
+    chown -R bind:bind /var/run/named /var/cache/bind
+
+EXPOSE 53/tcp 53/udp
+
+CMD ["/usr/sbin/named", "-g", "-c", "/etc/bind/named.conf", "-u", "bind"]
+EOF
+echo "✓ DNS Dockerfile created"
+
+# Create DHCP Dockerfile
+echo "Creating DHCP Dockerfile..."
+cat > ~/lab-infra/dhcp/src/Dockerfile << 'EOF'
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    apt-get install -y isc-dhcp-server && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create required directories and lease file
+RUN mkdir -p /var/lib/dhcp && \
+    touch /var/lib/dhcp/dhcpd.leases
+
+EXPOSE 67/udp 68/udp
+
+CMD ["/usr/sbin/dhcpd", "-f", "-d", "--no-pid", "-cf", "/etc/dhcp/dhcpd.conf"]
+EOF
+echo "✓ DHCP Dockerfile created"
+
 # Create DNS configuration files
 echo "Creating DNS configuration files..."
 cat > ~/lab-infra/dns/config/named.conf << 'EOF'
@@ -85,10 +133,8 @@ options {
         recursion yes;
         dnssec-validation no;
         managed-keys-directory "/var/named/dynamic";
-        geoip-directory "/usr/share/GeoIP";
         pid-file "/run/named/named.pid";
         session-keyfile "/run/named/session.key";
-        include "/etc/crypto-policies/back-ends/bind.config";
 };
 
 logging {
@@ -108,12 +154,14 @@ zone "10.168.192.in-addr.arpa" IN {
     file "db.10.168.192";
 };
 
-include "/etc/named.rfc1912.zones";
-include "/etc/named.root.key";
+zone "." IN {
+        type hint;
+        file "named.ca";
+};
 EOF
 echo "✓ Named configuration created"
 
-# Create forward zone file with OpenShift records
+# Create forward zone file
 echo "Creating forward zone file..."
 cat > ~/lab-infra/dns/config/db.lab.com << 'EOF'
 $TTL 604800
@@ -137,8 +185,6 @@ api-int.partner   IN   A       192.168.10.10
 *.apps.partner    IN   A       192.168.10.10
 oauth-openshift.apps.partner IN A 192.168.10.10
 console-openshift-console.apps.partner IN A 192.168.10.10
-prometheus-k8s-openshift-monitoring.apps.partner IN A 192.168.10.10
-canary-openshift-ingress-canary.apps.partner IN A 192.168.10.10
 
 ; Engineering hosts and OpenShift entries
 idclab479.engg    IN   A       192.168.10.104
@@ -146,9 +192,6 @@ api.engg          IN   A       192.168.10.104
 api-int.engg      IN   A       192.168.10.104
 *.apps.engg       IN   A       192.168.10.104
 oauth-openshift.apps.engg IN A 192.168.10.104
-console-openshift-console.apps.engg IN A 192.168.10.104
-prometheus-k8s-openshift-monitoring.apps.engg IN A 192.168.10.104
-canary-openshift-ingress-canary.apps.engg IN A 192.168.10.104
 
 ; Cluster hosts and OpenShift entries
 idclab647.clust   IN   A       192.168.10.165
@@ -157,9 +200,6 @@ api.clust         IN   A       192.168.10.165
 api-int.clust     IN   A       192.168.10.165
 *.apps.clust      IN   A       192.168.10.165
 oauth-openshift.apps.clust IN A 192.168.10.165
-console-openshift-console.apps.clust IN A 192.168.10.165
-prometheus-k8s-openshift-monitoring.apps.clust IN A 192.168.10.165
-canary-openshift-ingress-canary.apps.clust IN A 192.168.10.165
 
 ; KVM hosts and OpenShift entries
 idclab649.kvm     IN   A       192.168.10.177
@@ -168,9 +208,6 @@ api.kvm           IN   A       192.168.10.177
 api-int.kvm       IN   A       192.168.10.177
 *.apps.kvm        IN   A       192.168.10.177
 oauth-openshift.apps.kvm IN A 192.168.10.177
-console-openshift-console.apps.kvm IN A 192.168.10.177
-prometheus-k8s-openshift-monitoring.apps.kvm IN A 192.168.10.177
-canary-openshift-ingress-canary.apps.kvm IN A 192.168.10.177
 
 ; CICD hosts and OpenShift entries
 idclab650.cicd    IN   A       192.168.10.198
@@ -178,9 +215,6 @@ api.cicd          IN   A       192.168.10.198
 api-int.cicd      IN   A       192.168.10.198
 *.apps.cicd       IN   A       192.168.10.198
 oauth-openshift.apps.cicd IN A 192.168.10.198
-console-openshift-console.apps.cicd IN A 192.168.10.198
-prometheus-k8s-openshift-monitoring.apps.cicd IN A 192.168.10.198
-canary-openshift-ingress-canary.apps.cicd IN A 192.168.10.198
 EOF
 echo "✓ Forward zone file created"
 
@@ -219,6 +253,12 @@ $TTL    604800
 198     IN      PTR     idclab650.cicd.lab.com.
 EOF
 echo "✓ Reverse zone file created"
+
+# Validate configurations before proceeding
+if ! validate_configs; then
+    echo "Configuration validation failed. Deployment aborted."
+    exit 1
+fi
 
 # Build containers
 echo "Building DNS container..."
@@ -306,10 +346,6 @@ echo "   - dig @192.168.10.2 oauth-openshift.apps.partner.lab.com"
 echo "3. Specific OpenShift Service Tests:"
 echo "   - Console access:"
 echo "     dig @192.168.10.2 console-openshift-console.apps.partner.lab.com"
-echo "   - Monitoring:"
-echo "     dig @192.168.10.2 prometheus-k8s-openshift-monitoring.apps.partner.lab.com"
-echo "   - Ingress:"
-echo "     dig @192.168.10.2 canary-openshift-ingress-canary.apps.partner.lab.com"
 
 echo "4. DHCP Service:"
 echo "   - Test DHCP discovery:"
