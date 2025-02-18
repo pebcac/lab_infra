@@ -531,59 +531,58 @@ sudo firewall-cmd --permanent --add-service=mountd
 sudo firewall-cmd --reload
 echo "✓ Firewall rules configured"
 
-# Generate systemd service files using Quadlets
+# Generate systemd service files
 echo "Setting up systemd services..."
-mkdir -p ~/.config/containers/systemd/
+mkdir -p ~/.config/systemd/user/
 
-# Create DNS Quadlet
-cat > ~/.config/containers/systemd/dns-server.container << 'EOF'
+# Create DNS service
+cat > ~/.config/systemd/user/dns-server.service << 'EOF'
 [Unit]
 Description=DNS Server Container
 After=network-online.target
 Wants=network-online.target
 
-[Container]
-Image=localhost/local/dns-server:latest
-Network=host
-Volume=${HOME}/lab-infra/dns/config:/etc/bind
-Volume=${HOME}/lab-infra/dns/data:/var/lib/bind
-
 [Service]
 Restart=always
-TimeoutStartSec=900
+ExecStartPre=-/usr/bin/podman rm -f dns-server
+ExecStart=/usr/bin/podman run --rm --name dns-server \
+  --network host \
+  -v ${HOME}/lab-infra/dns/config:/etc/bind:Z \
+  -v ${HOME}/lab-infra/dns/data:/var/lib/bind:Z \
+  local/dns-server
+ExecStop=/usr/bin/podman stop dns-server
+Type=simple
 
 [Install]
 WantedBy=default.target
 EOF
 
-# Create DHCP Quadlet
-cat > ~/.config/containers/systemd/dhcp-server.container << 'EOF'
+# Create DHCP service
+cat > ~/.config/systemd/user/dhcp-server.service << 'EOF'
 [Unit]
 Description=DHCP Server Container
 After=network-online.target
 Wants=network-online.target
 
-[Container]
-Image=localhost/local/dhcp-server:latest
-Network=host
-AddCapability=NET_ADMIN
-Volume=${HOME}/lab-infra/dhcp/config:/etc/dhcp
-
 [Service]
 Restart=always
-TimeoutStartSec=900
+ExecStartPre=-/usr/bin/podman rm -f dhcp-server
+ExecStart=/usr/bin/podman run --rm --name dhcp-server \
+  --network host \
+  --cap-add=NET_ADMIN \
+  -v ${HOME}/lab-infra/dhcp/config:/etc/dhcp:Z \
+  local/dhcp-server
+ExecStop=/usr/bin/podman stop dhcp-server
+Type=simple
 
 [Install]
 WantedBy=default.target
 EOF
 
-# Enable podman socket
-systemctl --user enable --now podman.socket
-
 # Reload and start services
 systemctl --user daemon-reload
-systemctl --user enable --now ~/.config/containers/systemd/dns-server.container
-systemctl --user enable --now ~/.config/containers/systemd/dhcp-server.container
+systemctl --user enable dns-server.service dhcp-server.service
+systemctl --user start dns-server.service dhcp-server.service
 echo "✓ Systemd services created and started"
 
 echo ""
