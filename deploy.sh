@@ -1,6 +1,8 @@
 #!/bin/zsh
 
-# Function to check and install prerequisites
+# Set script to exit on error
+set -e
+
 check_prerequisites() {
     echo "Checking and installing prerequisites..."
 
@@ -30,38 +32,29 @@ check_prerequisites() {
     return 0
 }
 
-# Check and install prerequisites first
-if ! check_prerequisites; then
-    echo "Failed to install prerequisites. Please install them manually."
-    exit 1
-fi
-
-# Set script to exit on error
-set -e
-
 # Function to validate configurations
 validate_configs() {
     echo "Validating configurations..."
 
     # Validate DNS configuration
-    if ! named-checkconf ~/lab-infra/dns/config/named.conf; then
+    if ! sudo named-checkconf ~/lab-infra/dns/config/named.conf; then
         echo "❌ DNS configuration validation failed"
         return 1
     fi
 
     # Validate zone files
-    if ! named-checkzone lab.com ~/lab-infra/dns/config/db.lab.com; then
+    if ! sudo named-checkzone lab.com ~/lab-infra/dns/config/db.lab.com; then
         echo "❌ Forward zone validation failed"
         return 1
     fi
 
-    if ! named-checkzone 10.168.192.in-addr.arpa ~/lab-infra/dns/config/db.10.168.192; then
+    if ! sudo named-checkzone 10.168.192.in-addr.arpa ~/lab-infra/dns/config/db.10.168.192; then
         echo "❌ Reverse zone validation failed"
         return 1
     fi
 
     # Validate DHCP configuration
-    if ! dhcpd -t -cf ~/lab-infra/dhcp/config/dhcpd.conf; then
+    if ! sudo dhcpd -t -cf ~/lab-infra/dhcp/config/dhcpd.conf; then
         echo "❌ DHCP configuration validation failed"
         return 1
     fi
@@ -99,6 +92,12 @@ cleanup_existing() {
 }
 
 echo "Starting infrastructure deployment..."
+
+# Check and install prerequisites first
+if ! check_prerequisites; then
+    echo "Failed to install prerequisites. Please install them manually."
+    exit 1
+fi
 
 # Run cleanup first
 cleanup_existing
@@ -160,41 +159,41 @@ cat > ~/lab-infra/dns/config/named.conf << 'EOF'
 options {
         listen-on port 53 { 127.0.0.1; 192.168.10.2; };
         listen-on-v6 port 53 { none; };
-        directory       "/var/named";
-        dump-file       "/var/named/data/cache_dump.db";
-        statistics-file "/var/named/data/named_stats.txt";
-        memstatistics-file "/var/named/data/named_mem_stats.txt";
-        secroots-file   "/var/named/data/named.secroots";
-        recursing-file  "/var/named/data/named.recursing";
+        directory       "/etc/bind";
+        dump-file       "/var/lib/bind/cache_dump.db";
+        statistics-file "/var/lib/bind/named_stats.txt";
+        memstatistics-file "/var/lib/bind/named_mem_stats.txt";
+        secroots-file   "/var/lib/bind/named.secroots";
+        recursing-file  "/var/lib/bind/named.recursing";
         allow-query     { any; };
         forwarders      { 1.1.1.1; 1.0.0.1; };
         recursion yes;
         dnssec-validation no;
-        managed-keys-directory "/var/named/dynamic";
+        managed-keys-directory "/var/lib/bind";
         pid-file "/run/named/named.pid";
         session-keyfile "/run/named/session.key";
 };
 
 logging {
         channel default_debug {
-                file "data/named.run";
+                file "named.run";
                 severity dynamic;
         };
 };
 
 zone "lab.com" IN {
     type master;
-    file "db.lab.com";
+    file "/etc/bind/db.lab.com";
 };
 
 zone "10.168.192.in-addr.arpa" IN {
     type master;
-    file "db.10.168.192";
+    file "/etc/bind/db.10.168.192";
 };
 
 zone "." IN {
         type hint;
-        file "named.ca";
+        file "/etc/bind/named.ca";
 };
 EOF
 echo "✓ Named configuration created"
