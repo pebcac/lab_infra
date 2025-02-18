@@ -1,5 +1,41 @@
 #!/bin/zsh
 
+# Function to check and install prerequisites
+check_prerequisites() {
+    echo "Checking and installing prerequisites..."
+
+    # Check if running on RHEL/CentOS/Fedora
+    if command -v dnf &> /dev/null; then
+        echo "Installing bind utilities using dnf..."
+        sudo dnf install -y bind-utils bind &> /dev/null
+    elif command -v yum &> /dev/null; then
+        echo "Installing bind utilities using yum..."
+        sudo yum install -y bind-utils bind &> /dev/null
+    else
+        echo "❌ Unsupported package manager. Please install bind-utils and bind manually."
+        return 1
+    fi
+
+    # Check for dhcpd
+    if ! command -v dhcpd &> /dev/null; then
+        echo "Installing DHCP server..."
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y dhcp-server &> /dev/null
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y dhcp &> /dev/null
+        fi
+    fi
+
+    echo "✓ Prerequisites installed"
+    return 0
+}
+
+# Check and install prerequisites first
+if ! check_prerequisites; then
+    echo "Failed to install prerequisites. Please install them manually."
+    exit 1
+fi
+
 # Set script to exit on error
 set -e
 
