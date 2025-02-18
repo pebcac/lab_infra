@@ -347,6 +347,27 @@ option domain-name-servers 192.168.10.2;
 option ntp-servers 192.168.10.2;
 authoritative;
 
+# Class definitions
+class "partner-hosts" {
+    match if substring (hardware, 1, 3) = 10:70:fd;
+}
+
+class "engg-hosts" {
+    match if substring (hardware, 1, 3) = 10:70:fd;
+}
+
+class "ocp-clust-hosts" {
+    match if substring (hardware, 1, 3) = 10:70:fd;
+}
+
+class "ocp-kvm-hosts" {
+    match if substring (hardware, 1, 3) = 10:70:fd;
+}
+
+class "ocp-cicd-hosts" {
+    match if substring (hardware, 1, 3) = 10:70:fd;
+}
+
 # Single subnet declaration with pools
 subnet 192.168.10.0 netmask 255.255.255.0 {
     # Partner pool (10-99)
