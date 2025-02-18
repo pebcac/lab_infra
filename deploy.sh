@@ -3,7 +3,6 @@
 # Set script to exit on error
 set -e
 
-# Prerequisites check
 check_prerequisites() {
     echo "Checking and installing prerequisites..."
 
@@ -29,16 +28,24 @@ check_prerequisites() {
     return 0
 }
 
-# Function to validate configurations
 validate_configs() {
     echo "Validating configurations..."
 
-    # Create temporary directories for validation
-    sudo mkdir -p /etc/bind /var/lib/bind
+    # Create temporary directories for validation with proper error handling
+    echo "Setting up validation environment..."
+
+    # DNS validation setup
+    sudo mkdir -p /etc/bind /var/lib/bind || {
+        echo "Failed to create DNS directories"
+        return 1
+    }
     sudo chown $USER:$USER /etc/bind /var/lib/bind
 
-    # Copy files to temp location for validation
-    cp ~/lab-infra/dns/config/* /etc/bind/
+    # Copy DNS files
+    cp ~/lab-infra/dns/config/* /etc/bind/ || {
+        echo "Failed to copy DNS configuration files"
+        return 1
+    }
 
     # Validate DNS configuration
     if ! sudo named-checkconf /etc/bind/named.conf; then
@@ -57,23 +64,44 @@ validate_configs() {
         return 1
     fi
 
-    # Create temporary directories for DHCP validation
-    sudo mkdir -p /etc/dhcp /var/lib/dhcp
-    sudo touch /var/lib/dhcp/dhcpd.leases
-    sudo chown -R $USER:$USER /etc/dhcp /var/lib/dhcp
+    # DHCP validation setup
+    sudo mkdir -p /etc/dhcp || {
+        echo "Failed to create DHCP configuration directory"
+        return 1
+    }
+    sudo mkdir -p /var/lib/dhcp || {
+        echo "Failed to create DHCP lease directory"
+        return 1
+    }
+
+    # Create and set permissions for DHCP files
+    sudo touch /var/lib/dhcp/dhcpd.leases || {
+        echo "Failed to create DHCP lease file"
+        return 1
+    }
+
+    sudo chown -R $USER:$USER /etc/dhcp /var/lib/dhcp || {
+        echo "Failed to set DHCP directory permissions"
+        return 1
+    }
 
     # Copy DHCP configuration
-    cp ~/lab-infra/dhcp/config/dhcpd.conf /etc/dhcp/
+    cp ~/lab-infra/dhcp/config/dhcpd.conf /etc/dhcp/ || {
+        echo "Failed to copy DHCP configuration"
+        return 1
+    }
 
     # Validate DHCP configuration
     if ! sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf; then
         echo "❌ DHCP configuration validation failed"
-        sudo rm -rf /etc/dhcp/* /var/lib/dhcp/*
         return 1
     fi
 
-    # Cleanup temporary files
-    sudo rm -rf /etc/bind/* /etc/dhcp/* /var/lib/dhcp/*
+    # Cleanup
+    echo "Cleaning up validation environment..."
+    sudo rm -rf /etc/bind/* || true
+    sudo rm -rf /etc/dhcp/* || true
+    sudo rm -rf /var/lib/dhcp/* || true
 
     echo "✓ All configurations validated successfully"
     return 0
@@ -212,6 +240,7 @@ zone "." IN {
         file "/etc/bind/named.ca";
 };
 EOF
+
 echo "✓ Named configuration created"
 
 # Create forward zone file
