@@ -566,8 +566,8 @@ EOF
 
 # Reload and start services
 systemctl --user daemon-reload
-systemctl --user enable container-dns-server container-dhcp-server
-systemctl --user start container-dns-server container-dhcp-server
+systemctl --user enable dns-server.service dhcp-server.service
+systemctl --user start dns-server.service dhcp-server.service
 echo "✓ Systemd services created and started"
 
 echo ""
