@@ -36,19 +36,26 @@ check_prerequisites() {
 validate_configs() {
     echo "Validating configurations..."
 
+    # Create temporary directories for validation
+    sudo mkdir -p /etc/bind /var/lib/bind
+    sudo chown $USER:$USER /etc/bind /var/lib/bind
+
+    # Copy files to temp location for validation
+    cp ~/lab-infra/dns/config/* /etc/bind/
+
     # Validate DNS configuration
-    if ! sudo named-checkconf ~/lab-infra/dns/config/named.conf; then
+    if ! sudo named-checkconf /etc/bind/named.conf; then
         echo "❌ DNS configuration validation failed"
         return 1
     fi
 
     # Validate zone files
-    if ! sudo named-checkzone lab.com ~/lab-infra/dns/config/db.lab.com; then
+    if ! sudo named-checkzone lab.com /etc/bind/db.lab.com; then
         echo "❌ Forward zone validation failed"
         return 1
     fi
 
-    if ! sudo named-checkzone 10.168.192.in-addr.arpa ~/lab-infra/dns/config/db.10.168.192; then
+    if ! sudo named-checkzone 10.168.192.in-addr.arpa /etc/bind/db.10.168.192; then
         echo "❌ Reverse zone validation failed"
         return 1
     fi
@@ -58,6 +65,9 @@ validate_configs() {
         echo "❌ DHCP configuration validation failed"
         return 1
     fi
+
+    # Cleanup temporary files
+    sudo rm -rf /etc/bind/*
 
     echo "✓ All configurations validated successfully"
     return 0
