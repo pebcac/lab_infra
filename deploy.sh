@@ -60,14 +60,23 @@ validate_configs() {
         return 1
     fi
 
+    # Create temporary directories for DHCP validation
+    sudo mkdir -p /etc/dhcp /var/lib/dhcp
+    sudo touch /var/lib/dhcp/dhcpd.leases
+    sudo chown -R $USER:$USER /etc/dhcp /var/lib/dhcp
+
+    # Copy DHCP configuration
+    cp ~/lab-infra/dhcp/config/dhcpd.conf /etc/dhcp/
+
     # Validate DHCP configuration
-    if ! sudo dhcpd -t -cf ~/lab-infra/dhcp/config/dhcpd.conf; then
+    if ! sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf; then
         echo "❌ DHCP configuration validation failed"
+        sudo rm -rf /etc/dhcp/* /var/lib/dhcp/*
         return 1
     fi
 
     # Cleanup temporary files
-    sudo rm -rf /etc/bind/*
+    sudo rm -rf /etc/bind/* /etc/dhcp/* /var/lib/dhcp/*
 
     echo "✓ All configurations validated successfully"
     return 0
