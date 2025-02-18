@@ -3,29 +3,26 @@
 # Set script to exit on error
 set -e
 
+# Prerequisites check
 check_prerequisites() {
     echo "Checking and installing prerequisites..."
 
     # Check if running on RHEL/CentOS/Fedora
     if command -v dnf &> /dev/null; then
-        echo "Installing bind utilities using dnf..."
-        sudo dnf install -y bind-utils bind &> /dev/null
+        echo "Installing required packages using dnf..."
+        sudo dnf install -y bind-utils bind dhcp-server nfs-utils &> /dev/null
     elif command -v yum &> /dev/null; then
-        echo "Installing bind utilities using yum..."
-        sudo yum install -y bind-utils bind &> /dev/null
+        echo "Installing required packages using yum..."
+        sudo yum install -y bind-utils bind dhcp nfs-utils &> /dev/null
     else
-        echo "❌ Unsupported package manager. Please install bind-utils and bind manually."
+        echo "❌ Unsupported package manager. Please install packages manually."
         return 1
     fi
 
-    # Check for dhcpd
-    if ! command -v dhcpd &> /dev/null; then
-        echo "Installing DHCP server..."
-        if command -v dnf &> /dev/null; then
-            sudo dnf install -y dhcp-server &> /dev/null
-        elif command -v yum &> /dev/null; then
-            sudo yum install -y dhcp &> /dev/null
-        fi
+    # Verify NFS service exists
+    if ! systemctl list-unit-files | grep -q nfs-server.service; then
+        echo "❌ NFS server service not found after installation"
+        return 1
     fi
 
     echo "✓ Prerequisites installed"
@@ -352,10 +349,15 @@ echo "✓ DHCP server started"
 
 # Configure and start NFS
 echo "Starting NFS services..."
-sudo systemctl enable nfs-server
-sudo systemctl start nfs-server
-sudo exportfs -ra
-echo "✓ NFS services started"
+if systemctl list-unit-files | grep -q nfs-server.service; then
+    sudo systemctl enable nfs-server
+    sudo systemctl start nfs-server
+    sudo exportfs -ra
+    echo "✓ NFS services started"
+else
+    echo "❌ NFS server service not found. Please ensure nfs-utils is installed."
+    exit 1
+fi
 
 # Configure firewall
 echo "Configuring firewall rules..."
